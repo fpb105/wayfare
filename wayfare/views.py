@@ -57,18 +57,6 @@ def airport_search_form(request):
 
     return render(request, "wayfare/search.html", {"form": form})
 
-SERPAPI_TRIP_TYPE = {
-    "ONEWAY": "2",
-    "ROUND": "1",
-}
-
-SERPAPI_TRAVEL_CLASS = {
-    "ECONOMY": "1",
-    "PREMIUM ECONOMY": "2",
-    "BUSINESS": "3",
-    "FIRST": "4",
-}
-
 @login_required
 def flight_results(request):
     departure_id = request.GET.get("departure_id")
@@ -80,12 +68,13 @@ def flight_results(request):
 
     params = {
         "engine": "google_flights",
+        "no_cache": False,
         "departure_id": departure_id,
         "arrival_id": arrival_id,
         "outbound_date": outbound_date,
-        "currency": request.user.profile.currency or "USD",
-        "type": SERPAPI_TRIP_TYPE.get(trip_type, "2"),
-        "travel_class": SERPAPI_TRAVEL_CLASS.get(travel_class, "1"),
+        "currency": "GBP",
+        "type": trip_type,
+        "travel_class": travel_class,
         "api_key": settings.SERPAPI_KEY,
     }
 

@@ -2,15 +2,15 @@ from django import forms
 from .models import Profile
 
 TRAVEL_CLASS_CHOICES = (
-    ("ECONOMY", "Economy"),
-    ("PREMIUM ECONOMY", "Premium Economy"),
-    ("BUSINESS", "Business"),
-    ("FIRST", "First"),
+    ("1", "Economy"),
+    ("2", "Premium Economy"),
+    ("3", "Business"),
+    ("4", "First"),
 )
 
 TRAVEL_TYPE_CHOICES = (
-    ("ONEWAY", "One-Way"),
-    ("ROUND", "Round Trip"),
+    ("1", "One-Way"),
+    ("2", "Round Trip"),
 )
 
 class ProfileForm(forms.ModelForm):
@@ -56,7 +56,7 @@ class FlightSearchForm(forms.Form):
         input_formats=["%d/%m/%Y", "%d/%m/%y"],
         help_text="dd/mm/yyyy",
     )
-    arriving_date = forms.DateField(
+    return_date = forms.DateField(
         required=False,
         label="Return date",
         input_formats=["%d/%m/%Y", "%d/%m/%y"],
@@ -75,8 +75,8 @@ class FlightSearchForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get("type") == "ROUND" and not cleaned_data.get("arriving_date"):
-            self.add_error("arriving_date", "Return date is required for a round trip.")
+        if cleaned_data.get("type") == "2" and not cleaned_data.get("return_date"):
+            self.add_error("return_date", "Return date is required for a round trip.")
         return cleaned_data
 
     #non external api options (do later)

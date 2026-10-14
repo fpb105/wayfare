@@ -47,9 +47,9 @@
 
     <div id="round-trip-fields">
       <p>
-        {{ form.arriving_date.label_tag }} {{ form.arriving_date }}
+        {{ form.return_date.label_tag }} {{ form.return_date }}
         <small>{{ form.arriving_date.help_text }}</small>
-        {{ form.arriving_date.errors }}
+        {{ form.return_date.errors }}
       </p>
       <p>
         {{ form.arrival_times.label_tag }} {{ form.arrival_times }}
@@ -65,7 +65,7 @@
     const roundTripFields = document.getElementById("round-trip-fields");
 
     function toggleRoundTripFields() {
-      roundTripFields.style.display = tripType.value === "ROUND" ? "block" : "none";
+      roundTripFields.style.display = tripType.value === "2" ? "block" : "none";
     }
 
     tripType.addEventListener("change", toggleRoundTripFields);
