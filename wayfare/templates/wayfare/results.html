@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flight Results</title>
+</head>
+<body>
+<h1>Flight Results</h1>
+
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+
+{% for itinerary in flights %}
+  <div class="itinerary">
+    <p class="price">£{{ itinerary.price }}</p>
+    <p class="duration">{{ itinerary.total_duration }} min total</p>
+
+    {% for leg in itinerary.flights %}
+      <div class="leg">
+        <span>{{ leg.departure_airport.id }} → {{ leg.arrival_airport.id }}</span>
+        <span>{{ leg.airline }}</span>
+        <span>{{ leg.duration }} min</span>
+      </div>
+    {% endfor %}
+  </div>
+{% empty %}
+  <p>No flights to show yet.</p>
+{% endfor %}
+</body>
+</html>

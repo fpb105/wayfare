@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Search a flight</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+  {% for message in messages %}
+    <p>{{ message }}</p>
+  {% endfor %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    {{ form.non_field_errors }}
+
+    <p>
+      {{ form.departure_id.label_tag }} {{ form.departure_id }}
+      {{ form.departure_id.errors }}
+    </p>
+    <div id="departure-results"></div>
+
+    <p>
+      {{ form.arrival_id.label_tag }} {{ form.arrival_id }}
+      {{ form.arrival_id.errors }}
+    </p>
+    <div id="arrival-results"></div>
+
+    <p>
+      {{ form.type.label_tag }} {{ form.type }}
+      {{ form.type.errors }}
+    </p>
+    <p>
+      {{ form.travel_class.label_tag }} {{ form.travel_class }}
+      {{ form.travel_class.errors }}
+    </p>
+    <p>
+      {{ form.outbound_date.label_tag }} {{ form.outbound_date }}
+      <small>{{ form.outbound_date.help_text }}</small>
+      {{ form.outbound_date.errors }}
+    </p>
+    <p>
+      {{ form.outbound_times.label_tag }} {{ form.outbound_times }}
+      {{ form.outbound_times.errors }}
+    </p>
+
+    <div id="round-trip-fields">
+      <p>
+        {{ form.arriving_date.label_tag }} {{ form.arriving_date }}
+        <small>{{ form.arriving_date.help_text }}</small>
+        {{ form.arriving_date.errors }}
+      </p>
+      <p>
+        {{ form.arrival_times.label_tag }} {{ form.arrival_times }}
+        {{ form.arrival_times.errors }}
+      </p>
+    </div>
+
+    <button type="submit">Save</button>
+  </form>
+
+  <script>
+    const tripType = document.getElementById("id_type");
+    const roundTripFields = document.getElementById("round-trip-fields");
+
+    function toggleRoundTripFields() {
+      roundTripFields.style.display = tripType.value === "ROUND" ? "block" : "none";
+    }
+
+    tripType.addEventListener("change", toggleRoundTripFields);
+    toggleRoundTripFields();
+  </script>
+</body>
+</html>

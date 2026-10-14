@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Your profile</title>
+</head>
+<body>
+  <p>Home: {{ Home }}</p>
+  <p>Currency: {{ currency }}</p>
+  <p>Travel type: {{ Type }}</p>
+
+  <p>Interests:</p>
+  <ul>
+    {% for i in Intrests %}
+      <li>{{ i.intrests }}</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<ul>
+{% for airport in airports %}
+  <li hx-on:click="document.getElementById('{{ target_input_id }}').value = '{{ airport.code }}'; this.closest('ul').innerHTML = '';">
+    {{ airport.code }} — {{ airport.name }}
+  </li>
+{% endfor %}
+</ul>
