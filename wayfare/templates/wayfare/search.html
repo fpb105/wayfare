@@ -16,21 +16,24 @@
     {{ form.non_field_errors }}
 
     <p>
+      {{ form.type.label_tag }} {{ form.type }}
+      {{ form.type.errors }}
+    </p>
+    
+    <p>
       {{ form.departure_id.label_tag }} {{ form.departure_id }}
+      <small>{{ form.departure_id.help_text }}</small>
       {{ form.departure_id.errors }}
     </p>
     <div id="departure-results"></div>
 
     <p>
       {{ form.arrival_id.label_tag }} {{ form.arrival_id }}
+      <small>{{ form.arrival_id.help_text }}</small>
       {{ form.arrival_id.errors }}
     </p>
     <div id="arrival-results"></div>
 
-    <p>
-      {{ form.type.label_tag }} {{ form.type }}
-      {{ form.type.errors }}
-    </p>
     <p>
       {{ form.travel_class.label_tag }} {{ form.travel_class }}
       {{ form.travel_class.errors }}
@@ -40,36 +43,104 @@
       <small>{{ form.outbound_date.help_text }}</small>
       {{ form.outbound_date.errors }}
     </p>
+
     <p>
-      {{ form.outbound_times.label_tag }} {{ form.outbound_times }}
-      {{ form.outbound_times.errors }}
+      {{ form.stops.label_tag }} {{ form.stops }}
+      {{ form.stops.errors }}
+    </p>
+    <p>
+      {{ form.outbound_time_range.label_tag }} {{ form.outbound_time_range }}
+      <small>{{ form.outbound_time_range.help_text }}</small>
+      {{ form.outbound_time_range.errors }}
+    </p>
+    <p>
+      {{ form.layover_duration.label_tag }} {{ form.layover_duration }}
+      <small>{{ form.layover_duration.help_text }}</small>
+      {{ form.layover_duration.errors }}
     </p>
 
     <div id="round-trip-fields">
       <p>
         {{ form.return_date.label_tag }} {{ form.return_date }}
-        <small>{{ form.arriving_date.help_text }}</small>
+        <small>{{ form.return_date.help_text }}</small>
         {{ form.return_date.errors }}
       </p>
       <p>
-        {{ form.arrival_times.label_tag }} {{ form.arrival_times }}
-        {{ form.arrival_times.errors }}
+        {{ form.return_time_range.label_tag }} {{ form.return_time_range }}
+        <small>{{ form.return_time_range.help_text }}</small>
+        {{ form.return_time_range.errors }}
       </p>
     </div>
 
+    <div id="multi-trip-fields">
+      <p>
+        {{ form.destination_amount.label_tag }} {{ form.destination_amount }}
+        <small>{{ form.destination_amount.help_text }}</small>
+        {{ form.destination_amount.errors }}
+      </p>
+
+
+      {{ formset.management_form }}
+      <div id="stops-container">
+        {% for stop_form in formset %}
+          <div class="stop-row">
+            {{ stop_form.m_departure_id.label_tag }} {{ stop_form.m_departure_id }}
+            <div class="departure-results"></div>
+            {{ stop_form.days_at_stop.label_tag }} {{ stop_form.days_at_stop }}
+          </div>
+        {% endfor %}
+      </div>
+
+      <template id="stop-template">
+        <div class="stop-row">
+          {{ formset.empty_form.m_departure_id.label_tag }} {{ formset.empty_form.m_departure_id }}
+          <div class="departure-results"></div>
+          {{ formset.empty_form.days_at_stop.label_tag }} {{ formset.empty_form.days_at_stop }}
+        </div>
+      </template>
+    </div>
     <button type="submit">Search</button>
   </form>
-
   <script>
     const tripType = document.getElementById("id_type");
     const roundTripFields = document.getElementById("round-trip-fields");
+    const multiTripFields = document.getElementById("multi-trip-fields");
+    
+    const totalForms = document.getElementById("id_form-TOTAL_FORMS");
+    const container = document.getElementById("stops-container");
+    const template = document.getElementById("stop-template");
 
     function toggleRoundTripFields() {
       roundTripFields.style.display = tripType.value === "1" ? "block" : "none";
     }
 
+    function toggleMultiTripFields() {
+      multiTripFields.style.display = tripType.value === "3" ? "block" : "none";
+    }
+
     tripType.addEventListener("change", toggleRoundTripFields);
+    tripType.addEventListener("change", toggleMultiTripFields);
     toggleRoundTripFields();
+    toggleMultiTripFields();
+
+    function setStopCount(n) {
+      const current = parseInt(totalForms.value, 10);
+      if (n > current) {
+        for (let i = current; i < n; i++) {
+          const html = template.innerHTML.replaceAll("__prefix__", i);
+          container.insertAdjacentHTML("beforeend", html);
+        }
+      } else if (n < current) {
+        container.querySelectorAll(".stop-row").forEach((row, i) => {
+          if (i >= n) row.remove();
+        });
+      }
+      totalForms.value = n;
+    }
+
+    document.getElementById("id_destination_amount").addEventListener("change", (e) => {
+      setStopCount(parseInt(e.target.value, 10) || 0);
+    });
   </script>
 </body>
 </html>
