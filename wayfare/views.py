@@ -82,7 +82,10 @@ def flight_results(request):
         params["return_date"] = arriving_date
 
     try:
+        print(f"GET Params: {params}")
         response = requests.get("https://serpapi.com/search", params=params, timeout=10)
+        print(f"Request URL: {response.request.url}")
+        print(f"Status: {response.status_code}")
         response.raise_for_status()
         data = response.json()
     except requests.RequestException:

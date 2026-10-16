@@ -1,5 +1,6 @@
 from django import forms
 from .models import Profile
+import datetime
 
 TRAVEL_CLASS_CHOICES = (
     ("1", "Economy"),
@@ -9,8 +10,8 @@ TRAVEL_CLASS_CHOICES = (
 )
 
 TRAVEL_TYPE_CHOICES = (
-    ("1", "One-Way"),
-    ("2", "Round Trip"),
+    ("2", "One-Way"),
+    ("1", "Round Trip"),
 )
 
 class ProfileForm(forms.ModelForm):
@@ -53,14 +54,14 @@ class FlightSearchForm(forms.Form):
     outbound_date = forms.DateField(
         required=True,
         label="Leaving date",
-        input_formats=["%d/%m/%Y", "%d/%m/%y"],
-        help_text="dd/mm/yyyy",
+        input_formats=["%Y-%m-%d"],
+        help_text="YYYY-MM-DD eg. 2000-04-06",
     )
     return_date = forms.DateField(
         required=False,
         label="Return date",
-        input_formats=["%d/%m/%Y", "%d/%m/%y"],
-        help_text="dd/mm/yyyy",
+        input_formats=["%Y-%m-%d"],
+        help_text="YYYY-MM-DD eg. 2000-04-06",
     )
     outbound_times = forms.TimeField(
         required=False,
@@ -75,9 +76,11 @@ class FlightSearchForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get("type") == "2" and not cleaned_data.get("return_date"):
+        l_type = cleaned_data.get("type")
+        l_outbound_date = cleaned_data.get('outbound_date')
+        l_return_date = cleaned_data.get('return_date')
+        if l_type == "1" and not l_return_date:
             self.add_error("return_date", "Return date is required for a round trip.")
-        return cleaned_data
 
     #non external api options (do later)
     """

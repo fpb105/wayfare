@@ -57,7 +57,7 @@
       </p>
     </div>
 
-    <button type="submit">Save</button>
+    <button type="submit">Search</button>
   </form>
 
   <script>
@@ -65,7 +65,7 @@
     const roundTripFields = document.getElementById("round-trip-fields");
 
     function toggleRoundTripFields() {
-      roundTripFields.style.display = tripType.value === "2" ? "block" : "none";
+      roundTripFields.style.display = tripType.value === "1" ? "block" : "none";
     }
 
     tripType.addEventListener("change", toggleRoundTripFields);
