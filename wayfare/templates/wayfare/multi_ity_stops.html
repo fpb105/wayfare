@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Multi-City Stop</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+  {% for message in messages %}
+    <p>{{ message }}</p>
+  {% endfor %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    {{ form.non_field_errors }}
+
+    <p>
+      {{ form.stop_id.label_tag }} {{ form.stop_id }}
+      <small>{{ form.stop_id.help_text }}</small>
+      {{ form.stop_id.errors }}
+    </p>
+    <div class="departure-results"></div>
+
+    <p>
+      {{ form.days_at_stop.label_tag }} {{ form.days_at_stop }}
+      {{ form.days_at_stop.errors }}
+    </p>
+
+    <p>
+      {{ form.outbound_time_range.label_tag }} {{ form.outbound_time_range }}
+      <small>{{ form.outbound_time_range.help_text }}</small>
+      {{ form.outbound_time_range.errors }}
+    </p>
+
+    <button type="submit">Add stop</button>
+  </form>
+</body>
+</html>

@@ -48,32 +48,42 @@ def profile(request):
     return render(request, 'wayfare/profile.html', context)
 
 @login_required
-def airport_search_form(request):
-    if request.method == "POST":
-        form = FlightSearchForm(request.POST)
-        trip_type = request.POST.get("type")
+def flight_search(request):
+    trip_type = request.GET.get("type") or request.POST.get("type")
 
-        expected = None
-        if trip_type == "3":
-            try:
-                expected = int(request.POST.get("destination_amount", ""))
-            except ValueError:
-                expected = None
+    is_post = request.method == "POST"
 
-        formset = MultiStopFormSet(request.POST, expected=expected)
+    one_way_form = OneWayForm(request.POST if is_post and trip_type == "2" else None)
+    return_form  = ReturnForm(request.POST if is_post and trip_type == "1" else None)
+    multi_form   = MultiCityMainForm(request.POST if is_post and trip_type == "3" else None)
 
-        form_ok = form.is_valid()
-        formset_ok = formset.is_valid() if trip_type == "3" else True
+    expected = None
+    if is_post and trip_type == "3":
+        try:
+            expected = int(request.POST.get("amount_of_stops", ""))
+        except ValueError:
+            expected = None
+    formset = MultiStopFormSet(request.POST if is_post and trip_type == "3" else None, expected=expected)
 
-        if form_ok and formset_ok:
-            data = form.cleaned_data.copy()
-            # handle multi-city legs separately, see note below
-            return redirect(f"{reverse('results')}?{urlencode(data)}")
-    else:
-        form = FlightSearchForm()
-        formset = MultiStopFormSet(expected=None)
+    if is_post:
+        active_form = {"2": one_way_form, "1": return_form, "3": multi_form}.get(trip_type)
+        if active_form is None:
+            messages.error(request, "Pick a trip type.")
+        else:
+            form_ok = active_form.is_valid()
+            formset_ok = formset.is_valid() if trip_type == "3" else True
+            if form_ok and formset_ok:
+                data = active_form.cleaned_data.copy()
+                data["type"] = trip_type
+                return redirect(f"{reverse('results')}?{urlencode(data)}")
 
-    return render(request, "wayfare/search.html", {"form": form, "formset": formset})
+    return render(request, "wayfare/search.html", {
+        "trip_type": trip_type,
+        "one_way_form": one_way_form,
+        "return_form": return_form,
+        "multi_form": multi_form,
+        "formset": formset,
+    })
 
 @login_required
 def flight_results(request):
@@ -102,7 +112,7 @@ def flight_results(request):
         "api_key": settings.SERPAPI_KEY,
     }
 
-    if trip_type == "1":
+    if trip_type == "1" or trip_type == "3":
         params["return_date"] = return_date
 
     if stops and stops != "0":
@@ -111,41 +121,43 @@ def flight_results(request):
     if outbound_time_range:
         params["outbound_times"] = outbound_time_range
 
-    if trip_type == "1" and return_time_range:
+    if (trip_type == "1" or trip_type == "3") and return_time_range:
         params["return_times"] = return_time_range
 
     if layover_duration:
         params["layover_duration"] = layover_duration
+    if trip_type != "3":
+        try:
+            print(f"GET Params: {params}")
+            response = requests.get("https://serpapi.com/search", params=params, timeout=10)
+            print(f"Request URL: {response.request.url}")
+            print(f"Status: {response.status_code}")
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException:
+            return render(request, "wayfare/results.html", {
+                "error": "Couldn't reach the flight search service — try again shortly.",
+                "flights": [],
+            })
 
-    try:
-        print(f"GET Params: {params}")
-        response = requests.get("https://serpapi.com/search", params=params, timeout=10)
-        print(f"Request URL: {response.request.url}")
-        print(f"Status: {response.status_code}")
-        response.raise_for_status()
-        data = response.json()
-    except requests.RequestException:
+        best_flights = data.get("best_flights", [])
+        other_flights = data.get("other_flights", [])
+
+        if not best_flights and not other_flights:
+            return render(request, "wayfare/results.html", {
+                "error": "No flights found for that search.",
+                "flights": [],
+            })
+
         return render(request, "wayfare/results.html", {
-            "error": "Couldn't reach the flight search service — try again shortly.",
-            "flights": [],
+            "flights": best_flights + other_flights,
         })
-
-    best_flights = data.get("best_flights", [])
-    other_flights = data.get("other_flights", [])
-
-    if not best_flights and not other_flights:
-        return render(request, "wayfare/results.html", {
-            "error": "No flights found for that search.",
-            "flights": [],
-        })
-
-    return render(request, "wayfare/results.html", {
-        "flights": best_flights + other_flights,
-    })
+    else:
+        pass
 
 @login_required
 def airport_search(request):
-    STOP_DEPARTURE_RE = re.compile(r"^form-(\d+)-m_departure_id$")
+    STOP_DEPARTURE_RE = re.compile(r"^form-(\d+)-stop_id$")
     if "departure_id" in request.GET:
         q = request.GET["departure_id"]
         target_input_id = "id_departure_id"
