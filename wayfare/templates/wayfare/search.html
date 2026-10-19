@@ -23,12 +23,12 @@
 
     {% if trip_type == "2" %}
       {{ one_way_form.non_field_errors }}
-      <div id="departure-results"></div>
-      <div id="arrival-results"></div>
       <p>{{ one_way_form.departure_id.label_tag }} {{ one_way_form.departure_id }}
         <small>{{ one_way_form.departure_id.help_text }}</small> {{ one_way_form.departure_id.errors }}</p>
+      <div id="departure-results"></div>
       <p>{{ one_way_form.arrival_id.label_tag }} {{ one_way_form.arrival_id }}
         <small>{{ one_way_form.arrival_id.help_text }}</small> {{ one_way_form.arrival_id.errors }}</p>
+      <div id="arrival-results"></div>
       <p>{{ one_way_form.travel_class.label_tag }} {{ one_way_form.travel_class }} {{ one_way_form.travel_class.errors }}</p>
       <p>{{ one_way_form.outbound_date.label_tag }} {{ one_way_form.outbound_date }}
         <small>{{ one_way_form.outbound_date.help_text }}</small> {{ one_way_form.outbound_date.errors }}</p>
@@ -40,12 +40,12 @@
 
     {% elif trip_type == "1" %}
       {{ return_form.non_field_errors }}
-      <div id="departure-results"></div>
-      <div id="arrival-results"></div>
       <p>{{ return_form.departure_id.label_tag }} {{ return_form.departure_id }}
         <small>{{ return_form.departure_id.help_text }}</small> {{ return_form.departure_id.errors }}</p>
+      <div id="departure-results"></div>
       <p>{{ return_form.arrival_id.label_tag }} {{ return_form.arrival_id }}
         <small>{{ return_form.arrival_id.help_text }}</small> {{ return_form.arrival_id.errors }}</p>
+      <div id="arrival-results"></div>
       <p>{{ return_form.travel_class.label_tag }} {{ return_form.travel_class }} {{ return_form.travel_class.errors }}</p>
       <p>{{ return_form.outbound_date.label_tag }} {{ return_form.outbound_date }}
         <small>{{ return_form.outbound_date.help_text }}</small> {{ return_form.outbound_date.errors }}</p>
@@ -61,9 +61,9 @@
 
     {% elif trip_type == "3" %}
       {{ multi_form.non_field_errors }}
-      <div id="departure-results"></div>
       <p>{{ multi_form.departure_id.label_tag }} {{ multi_form.departure_id }}
         <small>{{ multi_form.departure_id.help_text }}</small> {{ multi_form.departure_id.errors }}</p>
+      <div id="departure-results"></div>
       <p>{{ multi_form.travel_class.label_tag }} {{ multi_form.travel_class }} {{ multi_form.travel_class.errors }}</p>
       <p>{{ multi_form.outbound_date.label_tag }} {{ multi_form.outbound_date }}
         <small>{{ multi_form.outbound_date.help_text }}</small> {{ multi_form.outbound_date.errors }}</p>
@@ -99,8 +99,9 @@
           const current = parseInt(totalForms.value, 10);
           if (n > current) {
             for (let i = current; i < n; i++) {
-              const html = template.innerHTML.replaceAll("__prefix__", i);
-              container.insertAdjacentHTML("beforeend", html);
+                const html = template.innerHTML.replaceAll("__prefix__", i);
+                container.insertAdjacentHTML("beforeend", html);
+                htmx.process(container.lastElementChild);
             }
           } else if (n < current) {
             container.querySelectorAll(".stop-row").forEach((row, i) => {

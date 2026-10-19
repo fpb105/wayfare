@@ -26,6 +26,8 @@ class Profile(models.Model):
 class Airport(models.Model):
     code = models.CharField(max_length=3, unique=True, db_index=True)
     name = models.CharField(max_length=255)
+    city = models.CharField(max_length=255, blank=True)
+    flights = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return f"{self.code} — {self.name}"
+        return f"{self.code} — {self.name} — {self.city}"
