@@ -1,13 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Search a flight</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body>
-  {% for message in messages %}<p>{{ message }}</p>{% endfor %}
-
+{% extends "wayfare/main.html" %}
+{% block title %}Search a flight{% endblock %}
+{% block content %}
   <form method="post" action="{% url 'search' %}{% if trip_type %}?type={{ trip_type }}{% endif %}">
     {% csrf_token %}
 
@@ -119,5 +112,4 @@
 
     <button type="submit">Search</button>
   </form>
-</body>
-</html>
+{% endblock %}

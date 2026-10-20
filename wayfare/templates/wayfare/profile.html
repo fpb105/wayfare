@@ -1,10 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Your profile</title>
-</head>
-<body>
+{% extends "wayfare/main.html" %}
+{% block title %}Your profile{% endblock %}
+{% block content %}
   <p>Home: {{ Home }}</p>
   <p>Currency: {{ currency }}</p>
   <p>Travel type: {{ Type }}</p>
@@ -15,5 +11,4 @@
       <li>{{ i.intrests }}</li>
     {% endfor %}
   </ul>
-</body>
-</html>
+{% endblock %}

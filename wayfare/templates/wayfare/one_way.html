@@ -1,15 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>One-Way Flight Search</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body>
-  {% for message in messages %}
-    <p>{{ message }}</p>
-  {% endfor %}
-
+{% extends "wayfare/main.html" %}
+{% block title %}One-Way Flight Search{% endblock %}
+{% block content %}
   <form method="post">
     {% csrf_token %}
 
@@ -59,5 +50,4 @@
 
     <button type="submit">Search</button>
   </form>
-</body>
-</html>
+{% endblock %}

@@ -1,20 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Your profile</title>
-</head>
-<body>
+{% extends "wayfare/main.html" %}
+{% block title %}Your profile{% endblock %}
+{% block content %}
   <h1>Your profile</h1>
-
-  {% for message in messages %}
-    <p>{{ message }}</p>
-  {% endfor %}
 
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit">Save</button>
   </form>
-</body>
-</html>
+{% endblock %}

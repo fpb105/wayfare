@@ -1,14 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Trip Type</title>
-</head>
-<body>
-  {% for message in messages %}
-    <p>{{ message }}</p>
-  {% endfor %}
-
+{% extends "wayfare/main.html" %}
+{% block title %}Trip Type{% endblock %}
+{% block content %}
   <form method="post">
     {% csrf_token %}
 
@@ -21,5 +13,4 @@
 
     <button type="submit">Continue</button>
   </form>
-</body>
-</html>
+{% endblock %}

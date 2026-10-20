@@ -1,15 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Multi-City Stop</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body>
-  {% for message in messages %}
-    <p>{{ message }}</p>
-  {% endfor %}
-
+{% extends "wayfare/main.html" %}
+{% block title %}Multi-City Stop{% endblock %}
+{% block content %}
   <form method="post">
     {% csrf_token %}
 
@@ -35,5 +26,4 @@
 
     <button type="submit">Add stop</button>
   </form>
-</body>
-</html>
+{% endblock %}

@@ -1,15 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Multi-City Flight Search</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body>
-  {% for message in messages %}
-    <p>{{ message }}</p>
-  {% endfor %}
-
+{% extends "wayfare/main.html" %}
+{% block title %}Multi-City Flight Search{% endblock %}
+{% block content %}
   <form method="post">
     {% csrf_token %}
 
@@ -41,5 +32,4 @@
 
     <button type="submit">Continue</button>
   </form>
-</body>
-</html>
+{% endblock %}
