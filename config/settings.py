@@ -15,7 +15,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -118,6 +117,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+ADMIN_ENABLED = os.environ.get("ADMIN", "0") == "1"
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
@@ -131,6 +131,8 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 SERPAPI_KEY = os.environ["SERPAPI_KEY"]
 DATE_INPUT_FORMATS = ["%d/%m/%Y"]
 TIME_INPUT_FORMATS = ["%H:%M"]
+if ADMIN_ENABLED is True:
+    INSTALLED_APPS.append('django.contrib.admin')
 
 #cahches
 CACHES = {
