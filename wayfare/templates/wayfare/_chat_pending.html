@@ -1,0 +1,5 @@
+{% include "wayfare/_chat_message.html" with role="user" content=user_message %}
+<div class="chat-message chat-message-assistant"
+     hx-get="{% url 'chat_reply' %}?chat_id={{ chat_id }}" hx-trigger="load" hx-swap="outerHTML">
+  <em>Thinking…</em>
+</div>

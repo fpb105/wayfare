@@ -1,0 +1,26 @@
+{% extends "wayfare/main.html" %}
+{% block title %}Chat{% endblock %}
+{% block extra_head %}
+<style>
+  #chat-log { max-height: 60vh; overflow-y: auto; margin-bottom: 1rem; }
+  .chat-message { padding: 0.5rem 0.75rem; margin: 0.25rem 0; border-radius: 0.5rem; max-width: 75%; }
+  .chat-message-user { background: #e7f1ff; margin-left: auto; text-align: right; }
+  .chat-message-assistant { background: #f1f1f1; margin-right: auto; }
+</style>
+{% endblock %}
+{% block content %}
+  <div id="chat-log">
+    {% for message in visible_messages %}
+      {% include "wayfare/_chat_message.html" with role=message.role content=message.content %}
+    {% endfor %}
+  </div>
+
+  <form id="chat-form" hx-post="{% url 'chat_send' %}" hx-target="#chat-log" hx-swap="beforeend"
+        hx-on::before-request="this.reset(); this.style.display='none'"
+        hx-on::response-error="this.style.display=''">
+    {% csrf_token %}
+    <input type="hidden" name="chat_id" value="{{ chat_id }}">
+    <input type="text" name="message" placeholder="Ask about a destination..." required>
+    <button type="submit">Send</button>
+  </form>
+{% endblock %}

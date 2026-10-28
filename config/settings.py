@@ -1,4 +1,6 @@
 import os
+
+import django
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.environ.get("DJANGO_DEBUG") == "1"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
@@ -134,10 +136,15 @@ TIME_INPUT_FORMATS = ["%H:%M"]
 if ADMIN_ENABLED is True:
     INSTALLED_APPS.append('django.contrib.admin')
 
-#cahches
+# caches
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://redis:6379",
-    }
+        "LOCATION": "redis://redis:6379/0",
+    },
+    "chat": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://redis:6379/1",
+        "TIMEOUT": 300,
+    },   
 }
