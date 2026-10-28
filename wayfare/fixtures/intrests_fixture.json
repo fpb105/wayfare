@@ -1,0 +1,44 @@
+[
+  {
+    "model": "wayfare.intrests",
+    "pk": 1,
+    "fields": {
+      "intrests": "food"
+    }
+  },
+  {
+    "model": "wayfare.intrests",
+    "pk": 2,
+    "fields": {
+      "intrests": "sight seeing"
+    }
+  },
+  {
+    "model": "wayfare.intrests",
+    "pk": 3,
+    "fields": {
+      "intrests": "relaxing"
+    }
+  },
+  {
+    "model": "wayfare.intrests",
+    "pk": 4,
+    "fields": {
+      "intrests": "nightlife"
+    }
+  },
+  {
+    "model": "wayfare.intrests",
+    "pk": 5,
+    "fields": {
+      "intrests": "adventure"
+    }
+  },
+  {
+    "model": "wayfare.intrests",
+    "pk": 6,
+    "fields": {
+      "intrests": "shopping"
+    }
+  }
+]

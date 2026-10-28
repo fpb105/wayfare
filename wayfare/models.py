@@ -6,6 +6,9 @@ from django.db import models
 class Intrests(models.Model):
     intrests = models.CharField(max_length=255, unique=True)
 
+    def __str__(self):
+        return self.intrests
+
 class Profile(models.Model):
     class UserPreference(models.TextChoices):
         BUDGET = 'BUDGET', 'Budget'
@@ -16,17 +19,23 @@ class Profile(models.Model):
                                   on_delete=models.CASCADE, 
                                   related_name="profile")
     intrests = models.ManyToManyField(Intrests, blank=True)
-    home = models.CharField(max_length=255, blank=True)
-    currency = models.CharField(max_length=3, blank=True, default='GBP')
     type = models.CharField(max_length=10, choices=UserPreference, default=UserPreference.BUDGET, blank=True)
 
     def __str__(self):
         return f"Profile of {self.author}"
 
+class City(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    known_for = models.ManyToManyField(Intrests, blank=True)
+    budget = models.CharField(max_length=10, choices=Profile.UserPreference, default=Profile.UserPreference.BUDGET, blank=True)
+
+    def __str__(self):
+        return self.name
+
 class Airport(models.Model):
     code = models.CharField(max_length=3, unique=True, db_index=True)
     name = models.CharField(max_length=255)
-    city = models.CharField(max_length=255, blank=True)
+    city = models.ForeignKey(City, on_delete=models.SET_NULL, null=True, blank=True, related_name="airports")
     flights = models.PositiveIntegerField(default=0)
 
     def __str__(self):

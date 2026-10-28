@@ -7,11 +7,11 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from datetime import date, timedelta
 
 from .forms import *
-from .models import Profile, Intrests, Airport
+from .models import Profile, Intrests, City, Airport
 
 
 @login_required
@@ -22,15 +22,10 @@ def edit_profile(request):
         form = ProfileForm(request.POST, instance=profile)
         if form.is_valid():
             profile = form.save()
-            names = [n.strip() for n in form.cleaned_data["intrests_text"].split(",") if n.strip()]
-            interest_objs = [Intrests.objects.get_or_create(intrests=n)[0] for n in names]
-            profile.intrests.set(interest_objs)
             messages.success(request, "Profile saved.")
             return redirect("profile")
     else:
-        form = ProfileForm(instance=profile, initial={
-        "intrests_text": ", ".join(i.intrests for i in profile.intrests.all())
-    })
+        form = ProfileForm(instance=profile) 
 
     return render(request, "wayfare/edit_profile.html", {"form": form})
 
@@ -38,13 +33,9 @@ def edit_profile(request):
 def profile(request):
     profile, _ = Profile.objects.get_or_create(author=request.user)
     intrests = profile.intrests.all()
-    home = profile.home
-    currency = profile.currency
     type = profile.type
 
     context={'Intrests':intrests,
-          'Home':home,
-          'currency':currency,
           'Type':type, }
        
     return render(request, 'wayfare/profile.html', context)
@@ -210,10 +201,70 @@ def airport_search(request):
                 target_input_id = f"id_{key}"
                 break
 
-    airports = Airport.objects.filter(Q(name__icontains=q) | Q(code__icontains=q) | Q(city__icontains=q)).order_by("-flights")[:10] if q else []
+    airports = Airport.objects.filter(Q(name__icontains=q) | Q(code__icontains=q) | Q(city__name__icontains=q)).order_by("-flights")[:10] if q else []
 
     return render(request, "wayfare/_airport_results.html", {
         "airports": airports,
         "target_input_id": target_input_id,
     })
 
+@login_required
+def user_preferences(request):
+    profile, _ = Profile.objects.get_or_create(author=request.user)
+    return JsonResponse({"type": profile.type})
+
+@login_required
+def user_intrests(request):
+    profile, _ = Profile.objects.get_or_create(author=request.user)
+    data = list(profile.intrests.values_list("intrests", flat=True))
+    return JsonResponse(data, safe=False)
+
+@login_required
+def city_detail(request):
+    name = request.GET.get("name")
+    city = City.objects.filter(name__icontains=name).first() if name else None
+    if city is None:
+        return JsonResponse({"error": "city not found"}, status=404)
+
+    data = {
+        "id": city.id,
+        "name": city.name,
+        "known_for": list(city.known_for.values_list("intrests", flat=True)),
+        "budget": city.budget,
+    }
+    return JsonResponse(data)
+
+@login_required
+def city_search(request):
+    cities = City.objects.all()
+
+    known_for = request.GET.get("known_for")
+    if known_for:
+        cities = cities.filter(known_for__intrests__iexact=known_for)
+
+    budget = request.GET.get("budget")
+    if budget:
+        cities = cities.filter(budget=budget)
+
+    data = [
+        {
+            "id": city.id,
+            "name": city.name,
+            "known_for": list(city.known_for.values_list("intrests", flat=True)),
+            "budget": city.budget,
+        }
+        for city in cities[:20]
+    ]
+    return JsonResponse(data, safe=False)
+
+@login_required
+def city_airports(request, city_id):
+    airports = Airport.objects.filter(city_id=city_id)
+    data = [
+        {"code": airport.code, "name": airport.name, "flights": airport.flights}
+        for airport in airports
+    ]
+    return JsonResponse(data, safe=False)
+
+def chat(request):
+    pass

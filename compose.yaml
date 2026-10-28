@@ -1,4 +1,25 @@
 services:
+#https://medium.com/@prasanta.mohanty/deploying-ollama-with-docker-compose-a-simple-guide-to-local-llms-610db2991581
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    command: sh -c "ollama serve & sleep 2 && ollama pull qwen2.5:7b; wait"
+    ports: ["127.0.0.1:11434:11434"]
+    volumes:
+      - ollama:/root/.ollama
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: ${OLLAMA_GPU_DRIVER-nvidia}
+              count: ${OLLAMA_GPU_COUNT-1}
+              capabilities:
+                - gpu
+  
   db:
     image: postgres:17
     env_file: .env
@@ -34,3 +55,4 @@ services:
 
 volumes:
   pgdata:
+  ollama:

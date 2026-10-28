@@ -1,5 +1,5 @@
 from django import forms
-from .models import Profile
+from .models import Profile, Intrests
 from django.core.exceptions import ValidationError
 from django.forms import BaseFormSet, formset_factory
 import datetime
@@ -34,14 +34,15 @@ SORT_BY_CHOICES = (
 )
 
 class ProfileForm(forms.ModelForm):
-    intrests_text = forms.CharField(
-        required=False,
-        label="Interests",
-        help_text="Comma-separated, e.g. hiking, museums, food",
-    )
     class Meta:
-        model = Profile
-        fields = ["home", "currency", "type"]
+            model = Profile
+            fields = ['intrests', 'type']
+            widgets = {
+                'intrests': forms.CheckboxSelectMultiple(),
+            }
+            labels = {
+                'type': "Travel type",
+            }
 
 class TripTypeForm(forms.Form):
     type = forms.ChoiceField(
