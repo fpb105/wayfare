@@ -1,10 +1,18 @@
 import json
+import re
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Airport, City, Intrests, Profile
+from . import views as wayfare_views
+
+TEST_CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "chat": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+}
 
 
 class ProfileTests(TestCase):
@@ -134,3 +142,123 @@ class CityAndAirportApiTests(TestCase):
         ]:
             response = self.client.get(reverse(name, args=args))
             self.assertEqual(response.status_code, 302, f"{name} should redirect anonymous users")
+
+
+class ChatParsingAndLoopTests(TestCase):
+    def test_parse_reply_accepts_strict_hidden_true(self):
+        hidden, apis = wayfare_views._chat_parse_reply('[true, [["city_detail", {"name": "Narnia"}]]]')
+        self.assertTrue(hidden)
+        self.assertEqual(apis, [["city_detail", {"name": "Narnia"}]])
+
+    def test_parse_reply_accepts_strict_hidden_false(self):
+        hidden, apis = wayfare_views._chat_parse_reply("[false, []]")
+        self.assertFalse(hidden)
+        self.assertEqual(apis, [])
+
+    def test_parse_reply_rejects_invalid_json(self):
+        with self.assertRaises(ValueError):
+            wayfare_views._chat_parse_reply("")
+
+    def test_parse_reply_rejects_wrong_shape(self):
+        with self.assertRaises(ValueError):
+            wayfare_views._chat_parse_reply('[true, [], "extra"]')
+
+    def test_parse_reply_rejects_non_bool_hidden(self):
+        with self.assertRaises(ValueError):
+            wayfare_views._chat_parse_reply('["true", []]')
+
+    @patch("wayfare.views._chat_ask_ollama")
+    def test_run_chat_loop_calls_apis_then_returns_plain_answer(self, mock_ask):
+        mock_ask.side_effect = [
+            '[true, [["user_preferences", {}]]]',
+            "[false, []]",
+            "Here is your answer.",
+        ]
+        chat_messages = [{"role": "system", "content": "system prompt"}]
+        user = get_user_model().objects.create_user(
+            username="loopuser", email="loop@example.com", password="test-password"
+        )
+
+        reply = wayfare_views._run_chat_loop(chat_messages, user)
+
+        self.assertEqual(reply, "Here is your answer.")
+        self.assertEqual(mock_ask.call_count, 3)
+        roles = [m["role"] for m in chat_messages]
+        self.assertIn("assistant", roles)
+
+    @patch("wayfare.views._chat_ask_ollama")
+    @patch("wayfare.views.CHAT_MAX_HIDDEN_STEPS", 2)
+    def test_run_chat_loop_gives_up_after_max_steps(self, mock_ask):
+        mock_ask.return_value = "[true, []]"
+        user = get_user_model().objects.create_user(
+            username="stuckuser", email="stuck@example.com", password="test-password"
+        )
+
+        with self.assertRaises(RuntimeError):
+            wayfare_views._run_chat_loop([{"role": "system", "content": "system prompt"}], user)
+
+
+@override_settings(CACHES=TEST_CACHES)
+class ChatCacheTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="chatter", email="chatter@example.com", password="test-password"
+        )
+        self.client.login(email="chatter@example.com", password="test-password")
+
+    def _extract_chat_id(self, content):
+        match = re.search(r'name="chat_id" value="([0-9a-f]+)"', content.decode())
+        self.assertIsNotNone(match, "chat_id hidden field not found in response")
+        return match.group(1)
+
+    def test_chat_page_issues_a_fresh_chat_id_every_load(self):
+        first = self._extract_chat_id(self.client.get(reverse("chat")).content)
+        second = self._extract_chat_id(self.client.get(reverse("chat")).content)
+        self.assertNotEqual(first, second)
+
+    def test_chat_send_stores_messages_in_the_chat_cache(self):
+        chat_id = self._extract_chat_id(self.client.get(reverse("chat")).content)
+
+        response = self.client.post(reverse("chat_send"), {"chat_id": chat_id, "message": "hi there"})
+
+        self.assertEqual(response.status_code, 200)
+        chat_cache = wayfare_views.caches["chat"]
+        stored_messages = chat_cache.get(f"chat_messages_{chat_id}")
+        self.assertEqual(stored_messages[0]["role"], "system")
+        self.assertEqual(stored_messages[-1], {"role": "user", "content": "hi there"})
+        stored_visible = chat_cache.get(f"chat_visible_{chat_id}")
+        self.assertEqual(stored_visible, [{"role": "user", "content": "hi there"}])
+
+    def test_chat_send_rejects_a_second_message_while_locked(self):
+        chat_id = self._extract_chat_id(self.client.get(reverse("chat")).content)
+        wayfare_views.caches["chat"].set(f"chat_lock_{chat_id}", True, timeout=120)
+
+        response = self.client.post(reverse("chat_send"), {"chat_id": chat_id, "message": "hi there"})
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_chat_reply_without_chat_id_returns_400(self):
+        response = self.client.get(reverse("chat_reply"))
+        self.assertEqual(response.status_code, 400)
+
+    @patch("wayfare.views._chat_ask_ollama")
+    def test_chat_reply_appends_answer_and_releases_lock(self, mock_ask):
+        mock_ask.side_effect = ["[false, []]", "Final answer."]
+        chat_id = self._extract_chat_id(self.client.get(reverse("chat")).content)
+        self.client.post(reverse("chat_send"), {"chat_id": chat_id, "message": "hi there"})
+
+        response = self.client.get(reverse("chat_reply"), {"chat_id": chat_id})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Final answer.", response.content.decode())
+
+        chat_cache = wayfare_views.caches["chat"]
+        self.assertIsNone(chat_cache.get(f"chat_lock_{chat_id}"))
+        visible = chat_cache.get(f"chat_visible_{chat_id}")
+        self.assertEqual(visible[-1], {"role": "assistant", "content": "Final answer."})
+
+    def test_chat_views_require_login(self):
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("chat")).status_code, 302)
+        self.assertEqual(self.client.post(reverse("chat_send"), {"message": "hi"}).status_code, 302)
+        self.assertEqual(self.client.get(reverse("chat_reply"), {"chat_id": "x"}).status_code, 302)
