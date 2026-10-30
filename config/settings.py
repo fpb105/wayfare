@@ -131,6 +131,7 @@ MFA_PASSKEY_SIGNUP_ENABLED = True
 MFA_TRUST_ENABLED = True
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 SERPAPI_KEY = os.environ["SERPAPI_KEY"]
+CHAT_OLLAMA_URL = os.environ.get("CHAT_OLLAMA_URL", "http://ollama:11434/api/chat")
 DATE_INPUT_FORMATS = ["%d/%m/%Y"]
 TIME_INPUT_FORMATS = ["%H:%M"]
 if ADMIN_ENABLED is True:

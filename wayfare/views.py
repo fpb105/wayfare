@@ -16,7 +16,6 @@ from django.core.cache import caches
 from .forms import *
 from .models import Profile, Intrests, City, Airport, FlightQuery
 
-CHAT_OLLAMA_URL = "http://ollama:11434/api/chat"
 CHAT_MODEL = "qwen2.5:7b"
 CHAT_MAX_HIDDEN_STEPS = 10
 
@@ -349,7 +348,7 @@ def _chat_parse_reply(content):
 
 def _chat_ask_ollama(messages):
     response = requests.post(
-        CHAT_OLLAMA_URL,
+        settings.CHAT_OLLAMA_URL,
         json={"model": CHAT_MODEL, "messages": messages, "stream": False},
         timeout=120,
     )
