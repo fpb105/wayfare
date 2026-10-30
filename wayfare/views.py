@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from django.core.cache import caches
 
 from .forms import *
-from .models import Profile, Intrests, City, Airport
+from .models import Profile, Intrests, City, Airport, FlightQuery
 
 CHAT_OLLAMA_URL = "http://ollama:11434/api/chat"
 CHAT_MODEL = "qwen2.5:7b"
@@ -112,105 +112,120 @@ def flight_search(request):
 
 @login_required
 def flight_results(request):
-    trip_type = request.GET.get("type")
+    FlightQuery.objects.filter(date_till_expire__lt=date.today()).delete()
+    try:
+        trip_type = request.GET.get("type")
 
-    form_classes = {"2": OneWayForm, "1": ReturnForm, "3": MultiCityMainForm}
-    form_class = form_classes.get(trip_type)
-    if form_class is None:
-        return HttpResponseBadRequest("Invalid trip type")
+        form_classes = {"2": OneWayForm, "1": ReturnForm, "3": MultiCityMainForm}
+        form_class = form_classes.get(trip_type)
+        if form_class is None:
+            return HttpResponseBadRequest("Invalid trip type")
 
-    form = form_class(request.GET)
-    if not form.is_valid():
-        return HttpResponseBadRequest("Invalid parameters")
+        form = form_class(request.GET)
+        if not form.is_valid():
+            return HttpResponseBadRequest("Invalid parameters")
 
-    data = form.cleaned_data
+        data = form.cleaned_data
 
-    departure_id = data["departure_id"]
-    travel_class = data["travel_class"]
-    outbound_date = data["outbound_date"] 
-    params = {
-        "engine": "google_flights",
-        "deep_search": True,
-        "api_key": settings.SERPAPI_KEY,
-        "type": trip_type,
-        "departure_id": departure_id,
-        "outbound_date": outbound_date,
-        "travel_class": travel_class,
-    }
+        stops = {}
+        if trip_type == "3":
+            formset = MultiStopFormSet(request.GET, expected=data["amount_of_stops"])
+            if not formset.is_valid():
+                return HttpResponseBadRequest("Invalid stop parameters")
+            stops = {i + 1: f.cleaned_data for i, f in enumerate(formset.forms)}
 
-    if trip_type == "1" or trip_type=="2":
-        arrival_id = data["arrival_id"]
-        layovers = data["layovers"]
-        outbound_time_range = data["outbound_time_range"]
-        layover_duration = data["layover_duration"]
-        params["arrival_id"] = arrival_id
-        params["stops"] = layovers
-        params["outbound_times"] = outbound_time_range
-        params["layover_duration"] = layover_duration
+        query_data = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in data.items()}
+        for i, stop in stops.items():
+            for k, v in stop.items():
+                query_data[f"stop_{i}_{k}"] = v.isoformat() if hasattr(v, "isoformat") else v
+        query_key = urlencode(sorted(query_data.items()))
 
-    if trip_type == "1": #return
-        return_date = data["return_date"]
-        return_time_range = data["return_time_range"]
-        params["return_date"] = return_date
-        params["return_times"] = return_time_range
-    elif trip_type == "3": #multi city
-        amount_of_stops = data["amount_of_stops"]
-        formset = MultiStopFormSet(request.GET, expected=data["amount_of_stops"])
-        if not formset.is_valid():
-            return HttpResponseBadRequest("Invalid stop parameters")
-        stops = {i + 1: f.cleaned_data for i, f in enumerate(formset.forms)}
-    elif trip_type == "2":
-        pass #nothign needs to be done
-    else:
-        return HttpResponseBadRequest("Invalid trip type")
+        cached = FlightQuery.objects.filter(params=query_key, date_till_expire__gte=date.today()).first()
 
-    flights = {}
+        if cached:
+            flights = cached.results
+            return render(request, "wayfare/results.html", {"flights": flights})
+        else:
+            params_list = []
 
-    if trip_type != "3":
-        response = requests.get("https://serpapi.com/search", params=params, timeout=10)
-        response.raise_for_status()
-        result = response.json()
+            if trip_type == "2":
+                params_list.append({
+                    "engine": "google_flights",
+                    "deep_search": True,
+                    "api_key": settings.SERPAPI_KEY,
+                    "type": trip_type,
+                    "departure_id": data["departure_id"],
+                    "outbound_date": data["outbound_date"],
+                    "travel_class": data["travel_class"],
+                    "arrival_id": data["arrival_id"],
+                    "stops": data["layovers"],
+                    "outbound_times": data["outbound_time_range"],
+                    "layover_duration": data["layover_duration"],
+                })
 
-        flights[0] = result.get("best_flights", []) + result.get("other_flights", [])
-        
-        print(flights)
-        return render(request, "wayfare/results.html", {"flights": flights})
-            
-    elif trip_type == "3":
-        params["type"] = "2"                      # each leg is a one-way search
-        current_departure = departure_id
-        current_date = outbound_date
+            elif trip_type == "1":
+                params_list.append({
+                    "engine": "google_flights",
+                    "deep_search": True,
+                    "api_key": settings.SERPAPI_KEY,
+                    "type": trip_type,
+                    "departure_id": data["departure_id"],
+                    "outbound_date": data["outbound_date"],
+                    "travel_class": data["travel_class"],
+                    "arrival_id": data["arrival_id"],
+                    "stops": data["layovers"],
+                    "outbound_times": data["outbound_time_range"],
+                    "layover_duration": data["layover_duration"],
+                    "return_date": data["return_date"],
+                    "return_times": data["return_time_range"],
+                })
 
-        for i in range(int(amount_of_stops)):
-            stop = stops[i + 1]
+            elif trip_type == "3":
+                current_departure = data["departure_id"]
+                current_date = data["outbound_date"]
 
-            params["departure_id"] = current_departure
-            params["arrival_id"] = stop["stop_id"]
-            params["outbound_date"] = current_date.isoformat()
-            params["outbound_times"] = stop["outbound_time_range"]
+                for i in range(int(data["amount_of_stops"])):
+                    stop = stops[i + 1]
+                    params_list.append({
+                        "engine": "google_flights",
+                        "deep_search": True,
+                        "api_key": settings.SERPAPI_KEY,
+                        "type": "2",
+                        "travel_class": data["travel_class"],
+                        "departure_id": current_departure,
+                        "arrival_id": stop["stop_id"],
+                        "outbound_date": current_date.isoformat(),
+                        "outbound_times": stop["outbound_time_range"],
+                    })
+                    current_departure = stop["stop_id"]
+                    current_date += timedelta(days=stop["days_at_stop"])
 
-            response = requests.get("https://serpapi.com/search", params=params, timeout=30)
-            response.raise_for_status()
-            result = response.json()
+                params_list.append({
+                    "engine": "google_flights",
+                    "deep_search": True,
+                    "api_key": settings.SERPAPI_KEY,
+                    "type": "2",
+                    "travel_class": data["travel_class"],
+                    "departure_id": current_departure,
+                    "arrival_id": data["departure_id"],
+                    "outbound_date": current_date.isoformat(),
+                })
 
-            flights[i] = result.get("best_flights", []) + result.get("other_flights", [])
+            flights = []
+            for params in params_list:
+                response = requests.get("https://serpapi.com/search", params=params, timeout=30)
+                response.raise_for_status()
+                result = response.json()
+                flights.append(result.get("best_flights", []) + result.get("other_flights", []))
 
-            current_departure = stop["stop_id"]
-            current_date += timedelta(days=stop["days_at_stop"])
-
-        params["arrival_id"] = departure_id
-        params["outbound_date"] = current_date.isoformat()
-        response = requests.get("https://serpapi.com/search", params=params, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-
-        flights[i+1] = result.get("best_flights", []) + result.get("other_flights", [])
-
-    else:
-        return HttpResponseBadRequest("Invalid trip type") #just incase
-
-    print(flights)
-    return render(request, "wayfare/results.html", {"flights": flights})
+            FlightQuery.objects.create(
+                params=query_key,
+                results=flights,
+                date_till_expire=data["outbound_date"],
+            )
+            return render(request, "wayfare/results.html", {"flights": flights})
+    except:
+        return HttpResponseBadRequest("Something went wrong!")
 
 @login_required
 def airport_search(request):

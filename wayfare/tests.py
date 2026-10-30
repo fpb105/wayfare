@@ -1,13 +1,26 @@
 import json
 import re
-from unittest.mock import patch
+from datetime import date, timedelta
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Airport, City, Intrests, Profile
+from .models import Airport, City, FlightQuery, Intrests, Profile
 from . import views as wayfare_views
+
+FAKE_SERPAPI_KEY = "fake-test-key"
+
+
+def _mock_serpapi_response(best=None, other=None):
+    response = MagicMock()
+    response.raise_for_status = MagicMock()
+    response.json.return_value = {
+        "best_flights": best or [],
+        "other_flights": other or [],
+    }
+    return response
 
 TEST_CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
@@ -262,3 +275,157 @@ class ChatCacheTests(TestCase):
         self.assertEqual(self.client.get(reverse("chat")).status_code, 302)
         self.assertEqual(self.client.post(reverse("chat_send"), {"message": "hi"}).status_code, 302)
         self.assertEqual(self.client.get(reverse("chat_reply"), {"chat_id": "x"}).status_code, 302)
+
+
+@override_settings(SERPAPI_KEY=FAKE_SERPAPI_KEY)
+class FlightResultsTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="flyer", email="flyer@example.com", password="test-password"
+        )
+        self.client.login(email="flyer@example.com", password="test-password")
+        self.outbound_date = date.today() + timedelta(days=30)
+
+    def _one_way_params(self, **overrides):
+        params = {
+            "type": "2",
+            "departure_id": "LAX",
+            "arrival_id": "JFK",
+            "travel_class": "1",
+            "outbound_date": self.outbound_date.isoformat(),
+        }
+        params.update(overrides)
+        return params
+
+    @patch("wayfare.views.requests.get")
+    def test_search_hits_serpapi_and_stores_result_in_db(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response(best=[{"price": 100}])
+
+        response = self.client.get(reverse("results"), self._one_way_params())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(FlightQuery.objects.count(), 1)
+        stored = FlightQuery.objects.get()
+        self.assertEqual(stored.results, [[{"price": 100}]])
+        self.assertEqual(stored.date_till_expire, self.outbound_date)
+
+    @patch("wayfare.views.requests.get")
+    def test_repeat_search_reuses_db_row_instead_of_calling_serpapi_again(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response(best=[{"price": 100}])
+        params = self._one_way_params()
+
+        first = self.client.get(reverse("results"), params)
+        second = self.client.get(reverse("results"), params)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(FlightQuery.objects.count(), 1)
+
+    @patch("wayfare.views.requests.get")
+    def test_different_search_params_create_separate_db_rows(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response(best=[{"price": 100}])
+
+        self.client.get(reverse("results"), self._one_way_params())
+        self.client.get(reverse("results"), self._one_way_params(arrival_id="ORD"))
+
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(FlightQuery.objects.count(), 2)
+
+    @patch("wayfare.views.requests.get")
+    def test_multi_city_chains_legs_and_stores_one_row_with_all_legs(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response(best=[{"price": 50}])
+        params = {
+            "type": "3",
+            "departure_id": "LAX",
+            "travel_class": "1",
+            "outbound_date": self.outbound_date.isoformat(),
+            "amount_of_stops": "2",
+            "form-TOTAL_FORMS": "2",
+            "form-INITIAL_FORMS": "0",
+            "form-0-stop_id": "JFK",
+            "form-0-days_at_stop": "2",
+            "form-1-stop_id": "MIA",
+            "form-1-days_at_stop": "3",
+        }
+
+        response = self.client.get(reverse("results"), params)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 3)  # 2 stop legs + the leg home
+        stored = FlightQuery.objects.get()
+        self.assertEqual(len(stored.results), 3)
+
+        departure_ids = [c.kwargs["params"]["departure_id"] for c in mock_get.call_args_list]
+        arrival_ids = [c.kwargs["params"]["arrival_id"] for c in mock_get.call_args_list]
+        self.assertEqual(departure_ids, ["LAX", "JFK", "MIA"])
+        self.assertEqual(arrival_ids, ["JFK", "MIA", "LAX"])
+
+    def test_invalid_trip_type_returns_400(self):
+        response = self.client.get(reverse("results"), {"type": "9"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_form_params_return_400(self):
+        response = self.client.get(reverse("results"), {"type": "2", "departure_id": "LAX"})
+        self.assertEqual(response.status_code, 400)
+
+    @patch("wayfare.views.requests.get")
+    def test_serpapi_failure_is_caught_and_returns_400_without_storing_anything(self, mock_get):
+        mock_get.side_effect = Exception("serpapi is down")
+
+        response = self.client.get(reverse("results"), self._one_way_params())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(FlightQuery.objects.count(), 0)
+
+    def test_results_view_requires_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("results"), self._one_way_params())
+        self.assertEqual(response.status_code, 302)
+
+
+@override_settings(SERPAPI_KEY=FAKE_SERPAPI_KEY)
+class FlightQueryExpiryCleanupTests(TestCase):
+    """The view deletes rows past date_till_expire on every hit — it's a DB table, not an actual cache."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="cleaner", email="cleaner@example.com", password="test-password"
+        )
+        self.client.login(email="cleaner@example.com", password="test-password")
+
+    def _create_flight_query(self, date_till_expire, params="irrelevant"):
+        return FlightQuery.objects.create(params=params, results=[], date_till_expire=date_till_expire)
+
+    @patch("wayfare.views.requests.get")
+    def test_expired_rows_are_deleted_when_the_view_is_hit(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response()
+        expired = self._create_flight_query(date.today() - timedelta(days=1))
+
+        self.client.get(reverse("results"), {
+            "type": "2", "departure_id": "LAX", "arrival_id": "JFK",
+            "travel_class": "1", "outbound_date": (date.today() + timedelta(days=5)).isoformat(),
+        })
+
+        self.assertFalse(FlightQuery.objects.filter(pk=expired.pk).exists())
+
+    @patch("wayfare.views.requests.get")
+    def test_rows_not_yet_expired_are_kept(self, mock_get):
+        mock_get.return_value = _mock_serpapi_response()
+        still_valid = self._create_flight_query(date.today())
+
+        self.client.get(reverse("results"), {
+            "type": "2", "departure_id": "LAX", "arrival_id": "JFK",
+            "travel_class": "1", "outbound_date": (date.today() + timedelta(days=5)).isoformat(),
+        })
+
+        self.assertTrue(FlightQuery.objects.filter(pk=still_valid.pk).exists())
+
+    def test_cleanup_runs_even_when_the_request_itself_is_invalid(self):
+        expired = self._create_flight_query(date.today() - timedelta(days=1))
+
+        response = self.client.get(reverse("results"), {"type": "nope"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(FlightQuery.objects.filter(pk=expired.pk).exists())

@@ -40,3 +40,8 @@ class Airport(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.name} — {self.city}"
+
+class FlightQuery(models.Model):
+    params = models.CharField(max_length=5000)   # urlencode(cleaned_data)
+    results = models.JSONField()                # the raw flights list SerpAPI returned
+    date_till_expire = models.DateField(blank=False)    # api results arent valid if the current day exceeds reulst outbound time

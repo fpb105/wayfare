@@ -9,9 +9,9 @@
 
 <div class="container-fluid">
   <div class="row flex-nowrap overflow-x-auto" style="overflow-y: visible;">
-    {% for k, entries in flights.items %}
+    {% for entries in flights %}
       <div class="col-10 col-md-4" style="max-height: 70vh; overflow-y: auto;">
-        <h5>Leg {{ k|add:"1" }}</h5>
+        <h5>Leg {{ forloop.counter }}</h5>
         <ul class="list-group">
           {% for entry in entries %}
             <li class="list-group-item">
